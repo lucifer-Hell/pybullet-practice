@@ -1,0 +1,75 @@
+<?xml version="1.0" ?>
+<mujoco model="acebott_spider">
+  <compiler angle="degree" coordinate="local"/>
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+
+  <default>
+    <joint limited="true" damping="0.5"/>
+    <geom type="capsule" rgba="0.3 0.3 0.3 1"/>
+    <motor ctrlrange="-1 1"/>
+  </default>
+
+  <worldbody>
+    <!-- Central body -->
+    <body name="torso" pos="0 0 0.2">
+      <geom size="0.1 0.05 0.03" type="box"/>
+
+      <!-- Front Left Leg -->
+      <body name="front_left_hip" pos="0.07 0.06 0.03">
+        <joint name="front_left_hip_joint" type="hinge" axis="0 1 0" range="-60 60"/>
+        <geom fromto="0.07 0.06 0.03 0.12 0.06 0" size="0.015"/>
+
+        <body name="front_left_knee" pos="0.12 0.06 -0.05">
+          <joint name="front_left_knee_joint" type="hinge" axis="1 0 0" range="-45 45"/>
+          <geom fromto="0.12 0.06 -0.05 0.18 0.06 -0.1" size="0.015"/>
+        </body>
+      </body>
+
+      <!-- Front Right Leg -->
+      <body name="front_right_hip" pos="0.07 -0.06 0.03">
+        <joint name="front_right_hip_joint" type="hinge" axis="0 1 0" range="-60 60"/>
+        <geom fromto="0.07 -0.06 0.03 0.12 -0.06 0" size="0.015"/>
+
+        <body name="front_right_knee" pos="0.12 -0.06 -0.05">
+          <joint name="front_right_knee_joint" type="hinge" axis="1 0 0" range="-45 45"/>
+          <geom fromto="0.12 -0.06 -0.05 0.18 -0.06 -0.1" size="0.015"/>
+        </body>
+      </body>
+
+      <!-- Back Left Leg -->
+      <body name="back_left_hip" pos="-0.07 0.06 0.03">
+        <joint name="back_left_hip_joint" type="hinge" axis="0 1 0" range="-60 60"/>
+        <geom fromto="-0.07 0.06 0.03 -0.12 0.06 0" size="0.015"/>
+
+        <body name="back_left_knee" pos="-0.12 0.06 -0.05">
+          <joint name="back_left_knee_joint" type="hinge" axis="1 0 0" range="-45 45"/>
+          <geom fromto="-0.12 0.06 -0.05 -0.18 0.06 -0.1" size="0.015"/>
+        </body>
+      </body>
+
+      <!-- Back Right Leg -->
+      <body name="back_right_hip" pos="-0.07 -0.06 0.03">
+        <joint name="back_right_hip_joint" type="hinge" axis="0 1 0" range="-60 60"/>
+        <geom fromto="-0.07 -0.06 0.03 -0.12 -0.06 0" size="0.015"/>
+
+        <body name="back_right_knee" pos="-0.12 -0.06 -0.05">
+          <joint name="back_right_knee_joint" type="hinge" axis="1 0 0" range="-45 45"/>
+          <geom fromto="-0.12 -0.06 -0.05 -0.18 -0.06 -0.1" size="0.015"/>
+        </body>
+      </body>
+
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- Motors: 2 per leg -->
+    <motor joint="front_left_hip_joint"/>
+    <motor joint="front_left_knee_joint"/>
+    <motor joint="front_right_hip_joint"/>
+    <motor joint="front_right_knee_joint"/>
+    <motor joint="back_left_hip_joint"/>
+    <motor joint="back_left_knee_joint"/>
+    <motor joint="back_right_hip_joint"/>
+    <motor joint="back_right_knee_joint"/>
+  </actuator>
+</mujoco>
