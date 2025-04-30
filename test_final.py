@@ -121,14 +121,14 @@ class SpiderEnv(gym.Env):
 
         # big_action_reward = 10 * np.sum(np.clip(np.abs(action), 0.2, 1.0))
         vel =  delta_x/dt
-        forward_reward = 10.0 * vel if vel > 0 else 5 *vel 
-        penalty_sideways = -5.0 * np.abs(delta_y)
+        forward_reward = 5 * vel if vel > 0 else 6 *vel 
+        penalty_sideways = -0.001 * np.abs(delta_y)
 
         death_penalty = 0.0 if z_pos > 0.2 else -5.0
-        control_penalty = -0.0001 * np.sum(np.square(action))
+        control_penalty = -0.001 * np.sum(np.square(action))
         # slow_penalty = -8 if vel_x < 2 else 0
         slow_penalty = 0
-        reward = forward_reward + death_penalty  + slow_penalty + control_penalty + penalty_sideways
+        reward =  forward_reward + death_penalty  + slow_penalty + control_penalty + penalty_sideways
         done = z_pos < 0.2
 
         return self._get_obs(), reward, done, {}
@@ -148,7 +148,7 @@ model = PPO("MlpPolicy",
             env, 
             # learning_rate=2.0633e-05,
             learning_rate=get_schedule_fn(0.0001),
-            ent_coef=0.002,
+            ent_coef=0.0002,
             verbose=1,
             policy_kwargs=dict(
                 activation_fn=nn.ReLU,

@@ -27,7 +27,7 @@ print(f"Number of sensors: {n_sensors}")
 # Size of sensor data
 print(f"Size of sensordata array: {data.sensordata.shape}")
 
-frame_skip=10
+frame_skip=5
 
 print(f"Number of actuators: {n_actuators}")  # Should print 4 in your case
 pick_first=False
@@ -64,6 +64,6 @@ while viewer.is_running():
     spider_position = data.sensordata[:3]  # Since framepos has 3 values: x, y, z position
     print(f"Spider position: {spider_position}")
 
-    # time.sleep(0.01)
+    time.sleep(0.01)
 
 viewer.close()
