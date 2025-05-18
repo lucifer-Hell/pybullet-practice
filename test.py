@@ -23,12 +23,14 @@ frame_skip = 5
 
 # Simulation loop
 while viewer.is_running():
-    # Observation: [x, y, z] + [vx, vy, vz] + [ctrl0, ctrl1, ctrl2, ctrl3] → 10D
+    # === Collect Observation ===
     pos = data.sensordata[0:3]        # x, y, z from <framepos>
     vel = data.sensordata[3:6]        # vx, vy, vz from <velocimeter>
+    gyro = data.sensordata[6:9]       # wx, wy, wz from <angularvelocity>
     ctrl = data.ctrl[:]               # current actuator control
 
-    obs = np.concatenate([pos, vel, ctrl]).astype(np.float32).reshape(1, -1)
+    # Combine to match training format (13D input)
+    obs = np.concatenate([pos, vel, gyro, ctrl]).astype(np.float32).reshape(1, -1)
 
     # Predict action using PPO model
     action, _ = ppo_model.predict(obs)
@@ -38,9 +40,9 @@ while viewer.is_running():
     for _ in range(frame_skip):
         mujoco.mj_step(model, data)
 
-    # Sync viewer and debug print
+    # Sync viewer and print for debugging
     viewer.sync()
-    print(f"Position: {pos}, Velocity: {vel}, Controls: {ctrl}")
+    print(f"Position: {pos}, Velocity: {vel}, Gyro: {gyro}, Controls: {ctrl}")
 
     time.sleep(0.01)
 

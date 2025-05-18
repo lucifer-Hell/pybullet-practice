@@ -17,18 +17,19 @@ class SpiderEnv(gym.Env):
         # Action space: 4 joint positions (scaled between -1 and 1)
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(4,), dtype=np.float32)
 
-        # Observation space: [x, y, z] + [vx, vy, vz] + [4 actuator values] = 10D
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
+        # Observation space: [x, y, z] + [vx, vy, vz] + [wx, wy, wz] + [4 actuator values] = 13D
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32)
 
     def reset(self):
         mujoco.mj_resetData(self.model, self.data)
         return self._get_obs()
 
     def _get_obs(self):
-        pos = self.data.sensordata[0:3]     # x, y, z (from framepos)
-        vel = self.data.sensordata[3:6]     # vx, vy, vz (from velocimeter)
-        controls = self.data.ctrl[:]        # actuator values
-        obs = np.concatenate([pos, vel, controls])
+        pos = self.data.sensordata[0:3]         # x, y, z from <framepos>
+        vel = self.data.sensordata[3:6]         # vx, vy, vz from <velocimeter>
+        gyro = self.data.sensordata[6:9]        # wx, wy, wz from <gyroscope>
+        controls = self.data.ctrl[:]            # actuator values
+        obs = np.concatenate([pos, vel, gyro, controls])
         return obs
 
     def step(self, action):
@@ -36,35 +37,33 @@ class SpiderEnv(gym.Env):
         for _ in range(self.frame_skip):
             mujoco.mj_step(self.model, self.data)
 
-        # Read relevant values
+        # Reward components
         z_pos = self.data.sensordata[2]
         vx = self.data.sensordata[3]
+        gyro = self.data.sensordata[6:9]
 
-        # Reward components
-        forward_reward = vx                           # move forward
-        alive_bonus = 1.0 if z_pos > 0.2 else -10.0    # stay upright
-        control_penalty = -0.01 * np.sum(np.square(action))  # avoid excessive motor use
+        forward_reward = vx *5 if vx>0 else vx                             # reward for forward velocity
+        alive_bonus = 1.0 if z_pos > 0.2 else -10.0      # penalize falling
+        control_penalty = -0.01 * np.sum(np.square(action))
+        gyro_penalty = -0.05 * np.sum(np.square(gyro))  # penalize rotation instability
 
-        reward = forward_reward + alive_bonus + control_penalty
+        reward = forward_reward + alive_bonus + control_penalty + gyro_penalty
         done = z_pos < 0.2
 
-        # # Optional: print reward & velocity for debugging
         # if self.training:
-        #     print(f"vx: {vx:.3f}, reward: {reward:.2f}, z: {z_pos:.2f}")
+        #     print(f"vx: {vx:.3f}, gyro: {gyro}, reward: {reward:.2f}")
 
         return self._get_obs(), reward, done, {}
 
 # === PPO Training ===
 env = SpiderEnv()
 
-# Save checkpoints during training
 checkpoint_callback = CheckpointCallback(
     save_freq=100_000,
     save_path='./checkpoints/',
     name_prefix='ppo_spider'
 )
 
-# Define PPO model with optimized policy
 model = PPO(
     "MlpPolicy",
     env,
@@ -81,6 +80,5 @@ model = PPO(
     )
 )
 
-# Train the model
 model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
 model.save("ppo_spider_walk")
