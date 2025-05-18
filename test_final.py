@@ -38,16 +38,19 @@ class SpiderEnv(gym.Env):
             mujoco.mj_step(self.model, self.data)
 
         # Reward components
+        y_pos = self.data.sensordata[1]  # [x, y, z], so index 1 is Y
         z_pos = self.data.sensordata[2]
         vx = self.data.sensordata[3]
         gyro = self.data.sensordata[6:9]
 
-        forward_reward = vx *5 if vx>0 else vx                             # reward for forward velocity
+        forward_reward = vx  if vx>0 else vx*2        # reward for forward velocity
+        y_drift_penalty = -2.0 * abs(y_pos)
         alive_bonus = 1.0 if z_pos > 0.2 else -10.0      # penalize falling
         control_penalty = -0.01 * np.sum(np.square(action))
         gyro_penalty = -0.05 * np.sum(np.square(gyro))  # penalize rotation instability
+        jump_penalty = -2.0 * max(0.0, z_pos - 0.6)  # Penalize when torso rises too much
 
-        reward = forward_reward + alive_bonus + control_penalty + gyro_penalty
+        reward = forward_reward + alive_bonus + control_penalty + gyro_penalty + jump_penalty + y_drift_penalty
         done = z_pos < 0.2
 
         # if self.training:
@@ -67,9 +70,9 @@ checkpoint_callback = CheckpointCallback(
 model = PPO(
     "MlpPolicy",
     env,
-    learning_rate=0.0003,
-    n_steps=2048,
-    batch_size=256,
+    learning_rate=0.0002,
+    n_steps=8192,
+    batch_size=512,
     ent_coef=0.0,
     verbose=1,
     policy_kwargs=dict(
