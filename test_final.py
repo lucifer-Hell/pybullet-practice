@@ -1,87 +1,119 @@
-import gym
-from gym import spaces
+from gymnasium import Env, spaces
 import numpy as np
 import mujoco
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3 import PPO
 import torch.nn as nn
 
-class SpiderEnv(gym.Env):
+
+class SpiderEnv(Env):
     def __init__(self):
-        super(SpiderEnv, self).__init__()
+        super().__init__()
         self.model = mujoco.MjModel.from_xml_path("./default_world.xml")
         self.data = mujoco.MjData(self.model)
         self.frame_skip = 5
-        self.training = True  # enable logging while training
+        self.training = True
 
-        # Action space: 4 joint positions (scaled between -1 and 1)
+        self.seq_count = 30
+        self.action_timer = 0
+        self.current_action = np.zeros(4, dtype=np.float32)  # Holds action between updates
+
+
+        # Action: 4 joints
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(4,), dtype=np.float32)
 
-        # Observation space: [x, y, z] + [vx, vy, vz] + [wx, wy, wz] + [4 actuator values] = 13D
+        # Observation: [x, y, z] + [vx, vy, vz] + [wx, wy, wz] + [4 actuator values]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32)
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
-        return self._get_obs()
+        obs = self._get_obs()
+        self.current_action = np.zeros(4, dtype=np.float32)
+        self.action_timer = 0
+        return obs, {}  # required by Gymnasium
 
     def _get_obs(self):
-        pos = self.data.sensordata[0:3]         # x, y, z from <framepos>
-        vel = self.data.sensordata[3:6]         # vx, vy, vz from <velocimeter>
-        gyro = self.data.sensordata[6:9]        # wx, wy, wz from <gyroscope>
-        controls = self.data.ctrl[:]            # actuator values
-        obs = np.concatenate([pos, vel, gyro, controls])
-        return obs
+        pos = self.data.sensordata[0:3]   # x, y, z
+        vel = self.data.sensordata[3:6]   # vx, vy, vz
+        gyro = self.data.sensordata[6:9]  # wx, wy, wz
+        controls = self.data.ctrl[:]      # actuator inputs
+        return np.concatenate([pos, vel, gyro, controls])
 
     def step(self, action):
-        self.data.ctrl[:] = action
+        if self.action_timer == 0:
+            self.current_action = action.copy()
+
+        self.data.ctrl[:] =  self.current_action
+        self.action_timer = (self.action_timer + 1) % self.seq_count
+
         for _ in range(self.frame_skip):
             mujoco.mj_step(self.model, self.data)
 
-        # Reward components
-        y_pos = self.data.sensordata[1]  # [x, y, z], so index 1 is Y
+        # Extract values
+        y_pos = self.data.sensordata[1]
         z_pos = self.data.sensordata[2]
         vx = self.data.sensordata[3]
         gyro = self.data.sensordata[6:9]
 
-        forward_reward = vx  if vx>0 else vx*2        # reward for forward velocity
-        y_drift_penalty = -2.0 * abs(y_pos)
-        alive_bonus = 1.0 if z_pos > 0.2 else -10.0      # penalize falling
+        # Reward terms
+        forward_reward = vx if vx > 0 else vx * 2
+        # y_drift_penalty = -2.0 * abs(y_pos)
+        alive_bonus = 1.0 if z_pos > 0.2 else -10.0
         control_penalty = -0.01 * np.sum(np.square(action))
-        gyro_penalty = -0.05 * np.sum(np.square(gyro))  # penalize rotation instability
-        jump_penalty = -2.0 * max(0.0, z_pos - 0.6)  # Penalize when torso rises too much
+        gyro_penalty = -0.05 * np.sum(np.square(gyro))
+        # jump_penalty = -2.0 * max(0.0, z_pos - 0.6)
 
-        reward = forward_reward + alive_bonus + control_penalty + gyro_penalty + jump_penalty + y_drift_penalty
-        done = z_pos < 0.2
+        reward = (
+            forward_reward +
+            alive_bonus +
+            control_penalty +
+            gyro_penalty 
+        )
 
-        # if self.training:
-        #     print(f"vx: {vx:.3f}, gyro: {gyro}, reward: {reward:.2f}")
+        terminated = z_pos < 0.2  # Fell down
+        truncated = False         # No time limit set
 
-        return self._get_obs(), reward, done, {}
+        obs = self._get_obs()
+        return obs, reward, terminated, truncated, {}  # Gymnasium 5-tuple
+
+def make_env():
+    def _init():
+        env = SpiderEnv()
+        return env
+    return _init
+
 
 # === PPO Training ===
-env = SpiderEnv()
+if __name__ == "__main__":
+    from stable_baselines3.common.vec_env import SubprocVecEnv
+    num_envs = 4  # Or 8 or 16 depending on your CPU
 
-checkpoint_callback = CheckpointCallback(
-    save_freq=100_000,
-    save_path='./checkpoints/',
-    name_prefix='ppo_spider'
-)
+    env = SubprocVecEnv([make_env() for _ in range(num_envs)])
 
-model = PPO(
-    "MlpPolicy",
-    env,
-    learning_rate=0.0002,
-    n_steps=8192,
-    batch_size=512,
-    ent_coef=0.0,
-    verbose=1,
-    policy_kwargs=dict(
-        activation_fn=nn.ReLU,
-        net_arch=dict(pi=[256, 256], vf=[256, 256]),
-        log_std_init=-1.0,
-        ortho_init=True
+    # env = SpiderEnv()
+
+    checkpoint_callback = CheckpointCallback(
+        save_freq=100_000,
+        save_path='./checkpoints/',
+        name_prefix='ppo_spider'
     )
-)
 
-model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
-model.save("ppo_spider_walk")
+    model = PPO(
+        "MlpPolicy",
+        env,
+        learning_rate=0.0003,
+        n_steps=2048,
+        batch_size=256,
+        ent_coef=0.005,
+        verbose=1,
+        policy_kwargs=dict(
+            activation_fn=nn.ReLU,
+            net_arch=dict(pi=[256, 256], vf=[256, 256]),
+            log_std_init=-1.0,
+            ortho_init=True
+        )
+    )
+
+    model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+    model.save("ppo_spider_walk")

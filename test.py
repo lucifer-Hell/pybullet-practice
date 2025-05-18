@@ -20,7 +20,8 @@ print(f"Size of sensordata array: {data.sensordata.shape}")
 print(f"Number of actuators: {model.nu}")
 
 frame_skip = 5
-
+action_timer=0
+seq_count=30
 # Simulation loop
 while viewer.is_running():
     # === Collect Observation ===
@@ -33,7 +34,9 @@ while viewer.is_running():
     obs = np.concatenate([pos, vel, gyro, ctrl]).astype(np.float32).reshape(1, -1)
 
     # Predict action using PPO model
-    action, _ = ppo_model.predict(obs)
+    if action_timer==0:
+        action, _ = ppo_model.predict(obs)
+
     data.ctrl[:] = action.flatten()
 
     # Step simulation
@@ -43,7 +46,7 @@ while viewer.is_running():
     # Sync viewer and print for debugging
     viewer.sync()
     print(f"Position: {pos}, Velocity: {vel}, Gyro: {gyro}, Controls: {ctrl}")
-
+    action_timer = (action_timer +1)%seq_count
     time.sleep(0.01)
 
 viewer.close()
