@@ -47,10 +47,10 @@
     </body>
    </worldbody>
   <actuator>
-    <position joint="hip_front_right" kp="10"/>
-    <position joint="hip_back_right" kp="10"/>
-    <position joint="hip_front_left" kp="10"/>
-    <position joint="hip_back_left" kp="10"/>
+    <position joint="hip_front_right" kp="50"/>
+    <position joint="hip_back_right" kp="50"/>
+    <position joint="hip_front_left" kp="50"/>
+    <position joint="hip_back_left" kp="50"/>
   </actuator>
   <sensor>
     <framepos objtype="body" objname="spider"/>

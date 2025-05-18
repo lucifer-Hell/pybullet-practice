@@ -38,15 +38,17 @@ class SpiderEnv(gym.Env):
         z_pos = self.data.sensordata[2]
         vx = self.data.sensordata[3]
         vy = self.data.sensordata[4]
+        vz = self.data.sensordata[5]
 
-        forward_reward = 5.0 * vx if vx > 0 else 2.0 * vx
-        penalty_sideways = -0.1 * abs(vy)
+
+        forward_reward = (vx - 1.0)*50 if vx > 1.0 else -1
+        penalty_sideways = -0.5 * abs(vy)
         death_penalty = 0.0 if z_pos > 0.2 else -5.0
-        control_penalty = -0.001 * np.sum(np.square(action))
-        velocity_bonus = 5.0 if vx > 1.0 else 0.0
+        control_penalty = -0.01 * np.sum(np.square(action))
+        jump_penalty = -2.0 * max(0.0, self.data.sensordata[2] - 0.6)  # z > 0.3 is jumping
+        vz_penalty = -0.1 * abs(vz)
 
-
-        reward = forward_reward + control_penalty + penalty_sideways + death_penalty + velocity_bonus
+        reward = control_penalty + penalty_sideways + death_penalty + forward_reward + jump_penalty+vz_penalty
         done = z_pos < 0.2
 
         return self._get_obs(), reward, done, {}
@@ -65,16 +67,16 @@ checkpoint_callback = CheckpointCallback(
 model = PPO(
     "MlpPolicy", 
     env, 
-    learning_rate=get_schedule_fn(0.0001),
+    learning_rate=0.0005,
     ent_coef=0.0002,
     verbose=1,
     policy_kwargs=dict(
         activation_fn=nn.ReLU,
-        net_arch=[dict(pi=[256, 256], vf=[256, 256])],
+        net_arch=dict(pi=[256, 256], vf=[256, 256]),
         log_std_init=0,
         ortho_init=False
     )
 )
 
-model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+model.learn(total_timesteps=100_00_000, callback=checkpoint_callback)
 model.save("ppo_spider_walk")
