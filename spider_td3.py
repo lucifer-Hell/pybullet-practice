@@ -80,7 +80,8 @@ def make_env():
 
 
 if __name__ == "__main__":
-    env = DummyVecEnv([make_env()])
+    num_envs=6
+    env = DummyVecEnv([make_env() for _ in range(num_envs)])
 
     checkpoint_callback = CheckpointCallback(
         save_freq=100_000,
