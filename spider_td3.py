@@ -59,14 +59,21 @@ class SpiderEnv(Env):
         z_abs = z_after
         gyro = self.data.sensordata[6:9]
 
-        path_reward = np.clip(x_delta * 50, -5, 5)
+        path_complete_reward=0
+
+        # Reward terms
+        if x_delta >0:
+            path_complete_reward+= x_delta *20
+        else:
+            path_complete_reward+= x_delta*2
+
         y_drift_penalty = -1.0 * abs(y_delta)
         control_penalty = -0.01 * np.sum(np.square(action))
         gyro_penalty = -0.05 * np.sum(np.square(gyro))
         alive_bonus = 1.0 if z_abs > 0.2 else -10.0
         jump_penalty = -2.0 * max(0.0, z_abs - 0.6)
 
-        reward = path_reward + alive_bonus + control_penalty + gyro_penalty + jump_penalty + y_drift_penalty
+        reward = path_complete_reward + alive_bonus + control_penalty + gyro_penalty + jump_penalty + y_drift_penalty
 
         terminated = z_abs < 0.2
         truncated = False
@@ -84,7 +91,7 @@ if __name__ == "__main__":
     env = DummyVecEnv([make_env() for _ in range(num_envs)])
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=100_000,
+        save_freq=20_00_000,
         save_path='./checkpoints/',
         name_prefix='td3_spider',
     )
@@ -104,5 +111,5 @@ if __name__ == "__main__":
         verbose=1
     )
 
-    model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=100_00_000, callback=checkpoint_callback)
     model.save("td3_spider_walk")
