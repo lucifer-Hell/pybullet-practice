@@ -115,7 +115,7 @@ if __name__ == "__main__":
     # env = SpiderEnv()
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=20_00_000,
+        save_freq=50_00_000,
         save_path='./checkpoints/',
         name_prefix='ppo_spider'
     )
@@ -137,5 +137,5 @@ if __name__ == "__main__":
         )
     )
 
-    model.learn(total_timesteps=100_00_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=10_0000_000, callback=checkpoint_callback)
     model.save("ppo_spider_walk")
