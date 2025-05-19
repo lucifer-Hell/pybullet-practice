@@ -63,8 +63,13 @@ class SpiderEnv(Env):
 
         gyro = self.data.sensordata[6:9]
 
+        path_complete_reward=0
+
         # Reward terms
-        path_complete_reward = np.clip(x_delta * 50, -5, 5)
+        if x_delta >0:
+            path_complete_reward+= x_delta *20
+        else:
+            path_complete_reward+= x_delta*2
         y_drift_penalty = -2.0 * abs(y_delta) if y_delta>1 else 0
 
         control_penalty = -0.01 * np.sum(np.square(action))
