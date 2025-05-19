@@ -110,7 +110,7 @@ if __name__ == "__main__":
     # env = SpiderEnv()
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=30_00_000,
+        save_freq=20_00_000,
         save_path='./checkpoints/',
         name_prefix='ppo_spider'
     )
@@ -118,6 +118,7 @@ if __name__ == "__main__":
     model = PPO(
         "MlpPolicy",
         env,
+        device="cpu",
         learning_rate=0.0003,
         n_steps=2048,
         batch_size=512,
