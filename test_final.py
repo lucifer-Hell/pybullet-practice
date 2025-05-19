@@ -102,7 +102,7 @@ if __name__ == "__main__":
     from stable_baselines3.common.vec_env import SubprocVecEnv
     from stable_baselines3.common.utils import get_schedule_fn
 
-    num_envs = 1  # Or 8 or 16 depending on your CPU
+    num_envs = 16  # Or 8 or 16 depending on your CPU
 
     env = SubprocVecEnv([make_env() for _ in range(num_envs)])
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     # env = SpiderEnv()
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=100_000,
+        save_freq=30_00_000,
         save_path='./checkpoints/',
         name_prefix='ppo_spider'
     )
