@@ -14,7 +14,7 @@ class SpiderEnv(Env):
         self.frame_skip = 5
         self.training = True
 
-        self.seq_count = 30
+        self.seq_count = 20
         self.action_timer = 0
         self.current_action = np.zeros(4, dtype=np.float32)  # Holds action between updates
 
@@ -46,32 +46,45 @@ class SpiderEnv(Env):
 
         self.data.ctrl[:] =  self.current_action
         self.action_timer = (self.action_timer + 1) % self.seq_count
+        x_pos_before=self.data.sensordata[0]
+        y_pos_before=self.data.sensordata[1]
+        z_pos_before=self.data.sensordata[2]
 
         for _ in range(self.frame_skip):
             mujoco.mj_step(self.model, self.data)
+        x_pos_after=self.data.sensordata[0]
+        y_pos_after=self.data.sensordata[1]
+        z_pos_after=self.data.sensordata[2]
 
         # Extract values
-        y_pos = self.data.sensordata[1]
-        z_pos = self.data.sensordata[2]
-        vx = self.data.sensordata[3]
+        x_delta= x_pos_after-x_pos_before
+        y_delta= y_pos_after-y_pos_before
+        z_delta= z_pos_after-z_pos_before
+
         gyro = self.data.sensordata[6:9]
 
         # Reward terms
-        forward_reward = vx if vx > 0 else vx * 2
-        # y_drift_penalty = -2.0 * abs(y_pos)
-        alive_bonus = 1.0 if z_pos > 0.2 else -10.0
+        path_complete_reward = np.clip(x_delta * 50, -5, 5)
+        y_drift_penalty = -2.0 * abs(y_delta) if y_delta>1 else 0
+
         control_penalty = -0.01 * np.sum(np.square(action))
         gyro_penalty = -0.05 * np.sum(np.square(gyro))
-        # jump_penalty = -2.0 * max(0.0, z_pos - 0.6)
+
+        z_abs = self.data.sensordata[2]  # current Z
+        alive_bonus = 1.0 if z_abs > 0.2 else -10.0
+        jump_penalty = -2.0 * max(0.0, z_abs - 0.6)
+
 
         reward = (
-            forward_reward +
+            path_complete_reward+
             alive_bonus +
             control_penalty +
-            gyro_penalty 
+            gyro_penalty +
+            jump_penalty+
+            y_drift_penalty
         )
 
-        terminated = z_pos < 0.2  # Fell down
+        terminated = z_abs < 0.2  # Fell down
         truncated = False         # No time limit set
 
         obs = self._get_obs()
@@ -87,9 +100,12 @@ def make_env():
 # === PPO Training ===
 if __name__ == "__main__":
     from stable_baselines3.common.vec_env import SubprocVecEnv
-    num_envs = 4  # Or 8 or 16 depending on your CPU
+    from stable_baselines3.common.utils import get_schedule_fn
+
+    num_envs = 1  # Or 8 or 16 depending on your CPU
 
     env = SubprocVecEnv([make_env() for _ in range(num_envs)])
+
 
     # env = SpiderEnv()
 
@@ -104,8 +120,8 @@ if __name__ == "__main__":
         env,
         learning_rate=0.0003,
         n_steps=2048,
-        batch_size=256,
-        ent_coef=0.005,
+        batch_size=512,
+        ent_coef=0.01,
         verbose=1,
         policy_kwargs=dict(
             activation_fn=nn.ReLU,
@@ -115,5 +131,5 @@ if __name__ == "__main__":
         )
     )
 
-    model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=100_00_000, callback=checkpoint_callback)
     model.save("ppo_spider_walk")

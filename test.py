@@ -7,9 +7,10 @@ from stable_baselines3 import PPO
 # Load MuJoCo model and data
 model = mujoco.MjModel.from_xml_path("./default_world.xml")
 data = mujoco.MjData(model)
-
+# ppo_path='./checkpoints/ppo_spider_28800000_steps'
+ppo_path='ppo_spider_walk'
 # Load trained PPO model
-ppo_model = PPO.load("ppo_spider_walk")
+ppo_model = PPO.load(ppo_path)
 
 # Launch passive viewer
 viewer = mujoco.viewer.launch_passive(model, data)
@@ -21,7 +22,7 @@ print(f"Number of actuators: {model.nu}")
 
 frame_skip = 5
 action_timer=0
-seq_count=30
+seq_count=20
 # Simulation loop
 while viewer.is_running():
     # === Collect Observation ===
