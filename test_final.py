@@ -1,3 +1,5 @@
+import os
+import re
 from gymnasium import Env, spaces
 import numpy as np
 import mujoco
@@ -101,13 +103,13 @@ class SpiderEnv(Env):
 
         x_pos_after = self.data.sensordata[0]
         z_pos_after = self.data.sensordata[2]
-        x_delta = x_pos_after - x_pos_before
+        x_delta = int(np.floor(x_pos_after)) - int(np.floor(x_pos_before))
 
         # Raw reward components
-        forward_reward = x_delta / (self.frame_skip * 0.01)
+        forward_reward = x_delta / (self.frame_skip * 0.01) if x_delta>0 else -1
         control_penalty = -0.01 * np.sum(np.square(action))
-        gyro = self.data.sensordata[6:9]
-        gyro_penalty = -0.05 * np.sum(np.square(gyro))
+        # gyro = self.data.sensordata[6:9]
+        # gyro_penalty = -0.05 * np.sum(np.square(gyro))
         z_abs = z_pos_after
         alive_bonus = 1.0 if z_abs > 0.2 else -1.0
         jump_penalty = -1.0 * max(0.0, z_abs - 0.6)
@@ -117,7 +119,6 @@ class SpiderEnv(Env):
             forward_reward +
             alive_bonus +
             control_penalty +
-            gyro_penalty +
             jump_penalty
         )
 
@@ -136,6 +137,23 @@ def make_env():
     return _init
 
 
+
+def get_latest_checkpoint(checkpoint_dir, name_prefix):
+    max_step = -1
+    latest_path = None
+    pattern = re.compile(rf"{re.escape(name_prefix)}_(\d+)_steps\.zip")
+
+    for fname in os.listdir(checkpoint_dir):
+        match = pattern.match(fname)
+        if match:
+            step = int(match.group(1))
+            if step > max_step:
+                max_step = step
+                latest_path = os.path.join(checkpoint_dir, fname)
+
+    return latest_path
+
+
 # === PPO Training ===
 if __name__ == "__main__":
     from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -148,30 +166,66 @@ if __name__ == "__main__":
 
     # env = SpiderEnv()
 
+    # checkpoint_callback = CheckpointCallback(
+    #     save_freq=50_00_000,
+    #     save_path='./checkpoints/',
+    #     name_prefix='ppo_spider'
+    # )
+
+    # model = PPO(
+    #     "MlpPolicy",
+    #     env,
+    #     device="cpu",
+    #     learning_rate=0.0003,
+    #     n_steps=2048,
+    #     batch_size=256,
+    #     ent_coef=0.01,
+    #     verbose=1,
+    #     policy_kwargs=dict(
+    #         activation_fn=nn.ReLU,
+    #         net_arch=dict(pi=[256, 256], vf=[256, 256]),
+    #         log_std_init=-1.0,
+    #         ortho_init=True
+    #     )
+    # )
+
+    checkpoint_dir = "./checkpoints/"
+    checkpoint_prefix = "ppo_spider_latest"
+
+    
     checkpoint_callback = CheckpointCallback(
-        save_freq=500_000,
-        save_path='./checkpoints/',
-        name_prefix='ppo_spider'
+    save_freq=10_00_000,
+    save_path=checkpoint_dir,
+    name_prefix=checkpoint_prefix,
+    save_replay_buffer=False,
+    save_vecnormalize=False
     )
 
-    model = PPO(
-        "MlpPolicy",
-        env,
-        device="cpu",
-        learning_rate=0.0003,
-        n_steps=2048,
-        batch_size=256,
-        ent_coef=0.01,
-        verbose=1,
-        policy_kwargs=dict(
-            activation_fn=nn.ReLU,
-            net_arch=dict(pi=[256, 256], vf=[256, 256]),
-            log_std_init=-1.0,
-            ortho_init=True
+    latest_ckpt = get_latest_checkpoint(checkpoint_dir, checkpoint_prefix)
+
+    if latest_ckpt:
+        print(f"[✓] Loading checkpoint: {latest_ckpt}")
+        model = PPO.load(latest_ckpt, env=env, device="cpu")
+    else:
+        print("[+] No checkpoint found, starting from scratch...")
+        model = PPO(
+            "MlpPolicy",
+            env,
+            device="cpu",
+            learning_rate=0.0003,
+            n_steps=2048,
+            batch_size=256,
+            ent_coef=0.01,
+            verbose=1,
+            policy_kwargs=dict(
+                activation_fn=nn.ReLU,
+                net_arch=dict(pi=[256, 256], vf=[256, 256]),
+                log_std_init=-1.0,
+                ortho_init=True
+            )
         )
-    )
 
     # model.learn(total_timesteps=100_000_000, callback=checkpoint_callback)
-    model.learn(total_timesteps=40_00_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
 
     model.save("ppo_spider_walk")
