@@ -66,11 +66,12 @@ class SpiderEnv(Env):
         path_complete_reward=0
 
         # Reward terms
-        if x_delta >0:
-            path_complete_reward+= x_delta *20
+        if x_delta >0 & x_pos_after>0:
+            path_complete_reward+= x_delta *7
         else:
-            path_complete_reward+= x_delta*2
-        y_drift_penalty = -2.0 * abs(y_delta) if y_delta>1 else 0
+            path_complete_reward+= -abs(x_delta)*3
+
+        y_drift_penalty = -2.0 * abs(y_pos_after) if y_pos_after!=0 else 0
 
         control_penalty = -0.01 * np.sum(np.square(action))
         gyro_penalty = -0.05 * np.sum(np.square(gyro))
