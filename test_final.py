@@ -77,7 +77,7 @@ class SpiderEnv(Env):
         gyro_penalty = -0.05 * np.sum(np.square(gyro))
 
         z_abs = self.data.sensordata[2]  # current Z
-        alive_bonus = 1.0 if z_abs > 0.2 else -10.0
+        alive_bonus = 1.0 if z_abs > 0.2 else -1.0
         # jump_penalty = -2.0 * max(0.0, z_abs - 0.6)
 
 
