@@ -63,31 +63,29 @@ class SpiderEnv(Env):
 
         gyro = self.data.sensordata[6:9]
 
-        path_complete_reward=0
 
         # Reward terms
-        if x_delta >0 & x_pos_after>0:
-            path_complete_reward+= x_delta *7
-        else:
-            path_complete_reward+= -abs(x_delta)*3
-
-        y_drift_penalty = -2.0 * abs(y_pos_after) if y_pos_after!=0 else 0
+        # if x_delta >0 and x_pos_after>x_pos_before and x_pos_before>0:
+        #     path_complete_reward+= x_delta *7
+        # else:
+        #     path_complete_reward+= -abs(x_delta)*7
+        forward_reward= x_delta / (self.frame_skip*0.01)
+        # y_drift_penalty = -10.0 * abs(y_delta) if y_delta>0 else 0
+        # y_drift_penalty = -7 if abs(y_pos_after)>1 else 0
 
         control_penalty = -0.01 * np.sum(np.square(action))
         gyro_penalty = -0.05 * np.sum(np.square(gyro))
 
         z_abs = self.data.sensordata[2]  # current Z
         alive_bonus = 1.0 if z_abs > 0.2 else -10.0
-        jump_penalty = -2.0 * max(0.0, z_abs - 0.6)
+        # jump_penalty = -2.0 * max(0.0, z_abs - 0.6)
 
 
         reward = (
-            path_complete_reward+
+            forward_reward+
             alive_bonus +
             control_penalty +
-            gyro_penalty +
-            jump_penalty+
-            y_drift_penalty
+            gyro_penalty 
         )
 
         terminated = z_abs < 0.2  # Fell down
@@ -139,4 +137,6 @@ if __name__ == "__main__":
     )
 
     model.learn(total_timesteps=10_0000_000, callback=checkpoint_callback)
+    # model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+
     model.save("ppo_spider_walk")
