@@ -106,12 +106,12 @@ class SpiderEnv(Env):
         x_delta = int(np.floor(x_pos_after)) - int(np.floor(x_pos_before))
 
         # Raw reward components
-        forward_reward = x_delta / (self.frame_skip * 0.01) if x_delta>0 else -1
+        forward_reward = x_delta / (self.frame_skip * 0.01) if x_delta>0 else -0.5
         control_penalty = -0.01 * np.sum(np.square(action))
         # gyro = self.data.sensordata[6:9]
         # gyro_penalty = -0.05 * np.sum(np.square(gyro))
         z_abs = z_pos_after
-        alive_bonus = 1.0 if z_abs > 0.2 else -1.0
+        alive_bonus = 0.0 if z_abs > 0.2 else -1.0
         jump_penalty = -1.0 * max(0.0, z_abs - 0.6)
 
         # Final reward
@@ -226,6 +226,6 @@ if __name__ == "__main__":
         )
 
     # model.learn(total_timesteps=100_000_000, callback=checkpoint_callback)
-    model.learn(total_timesteps=10_00_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=1000_00_000, callback=checkpoint_callback)
 
     model.save("ppo_spider_walk")
