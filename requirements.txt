@@ -10,7 +10,7 @@ etils==1.12.2
 executing==2.2.0
 Farama-Notifications==0.0.4
 fasteners==0.19
-filelock==3.18.0
+filelock==3.20.3
 fonttools==4.57.0
 fsspec==2025.3.2
 gitdb==4.0.12
